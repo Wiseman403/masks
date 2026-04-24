@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#0a0a0a" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <title>AR Face Masks</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+        rel="stylesheet" />
+
+    <link rel="stylesheet" href="./styles/index.css" />
+</head>
+
+<body>
+
+    <!-- IMPORTMAP — Three.js r160 + addons via jsdelivr -->
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+        }
+    }
+    </script>
+
+    <div id="root">
+
+        <!-- AR VIEW -->
+        <div id="ar-container" aria-hidden="true"></div>
+
+        <!-- REC INDICATOR -->
+        <div id="rec-indicator" role="status" aria-live="polite" aria-atomic="true" aria-label="Recording timer">
+            <span class="rec-dot"></span>
+            <span id="rec-time">00:00</span>
+        </div>
+
+        <!-- TOAST CONTAINER -->
+        <div id="toast-container" role="region" aria-live="polite" aria-label="Notifications"></div>
+
+        <!-- TOP BAR -->
+        <header id="hud-top" role="banner">
+            <div class="hud-title">AR MASKS</div>
+            <div class="hud-top-actions">
+                <button type="button" id="btn-mirror" class="hud-btn icon active" aria-label="Mirror toggle" aria-pressed="true">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 3v18M8 7l-5 5 5 5M16 7l5 5-5 5" />
+                    </svg>
+                </button>
+                <button type="button" id="btn-flip" class="hud-btn icon" aria-label="Flip camera">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M23 4v6h-6M1 20v-6h6" />
+                        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+                    </svg>
+                </button>
+                <button type="button" id="btn-fullscreen" class="hud-btn icon" aria-label="Fullscreen" title="Fullscreen (F)">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M3 8V3h5M21 8V3h-5M3 16v5h5M21 16v5h-5" />
+                    </svg>
+                </button>
+            </div>
+        </header>
+
+        <!-- BOTTOM CONTROLS -->
+        <main id="hud-bottom">
+            <section id="mask-selector" role="listbox" aria-label="Mask selector" tabindex="0"></section>
+
+            <section class="capture-row">
+                <button type="button" id="btn-photo" class="capture-btn photo" aria-label="Take photo (Space)">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                        <circle cx="12" cy="13" r="4" />
+                    </svg>
+                </button>
+                <button type="button" id="btn-video" class="capture-btn video" aria-label="Record video (R)" aria-pressed="false">REC</button>
+            </section>
+        </main>
+
+        <!-- PERMISSION OVERLAY -->
+        <div id="permission-overlay" role="dialog" aria-labelledby="perm-title">
+            <div class="perm-card">
+                <div class="perm-title" id="perm-title">Camera Access</div>
+                <div class="perm-text">This app needs camera access to detect your face and place a mask on it.
+                    Nothing is sent off your device.</div>
+                <div class="perm-actions">
+                    <button type="button" id="perm-grant" class="hud-btn primary">Grant Access</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- BOOT SCREEN -->
+        <div id="boot-screen" role="status" aria-live="polite">
+            <div class="boot-spinner"></div>
+            <div class="boot-status" id="boot-status">STARTING</div>
+        </div>
+
+    </div>
+
+    <script type="module" src="./src/main.js"></script>
+</body>
+
+</html>
