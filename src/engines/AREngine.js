@@ -45,6 +45,10 @@ export class AREngine {
         this._envTexture = null;
         /** @type {number | null} */
         this._loadingToastId = null;
+        /** @type {ResizeObserver | null} */
+        this._ro = null;
+        /** @type {number[]} */
+        this._resizeKicks = [];
     }
 
     async init() {
@@ -145,6 +149,21 @@ export class AREngine {
             this.mindarThree.renderer.setAnimationLoop(() => this.frame());
 
             this.resize();
+
+            // Mobile Chrome's URL-bar collapse changes the viewport AFTER
+            // the first paint, and MindAR's internal sizing happens before
+            // we get control back. Watch the container and re-size every
+            // time it changes; also kick a few delayed resizes to catch
+            // the URL-bar animation tail.
+            if ('ResizeObserver' in window) {
+                this._ro = new ResizeObserver(() => this.resize());
+                this._ro.observe(this.container);
+            }
+            this._resizeKicks = [
+                requestAnimationFrame(() => this.resize()),
+                setTimeout(() => this.resize(), 200),
+                setTimeout(() => this.resize(), 800),
+            ];
         } finally {
             this.starting = false;
         }
@@ -183,11 +202,17 @@ export class AREngine {
         const w = this.container.clientWidth;
         const h = this.container.clientHeight;
         if (!w || !h) return;
-        // Pass `true` so setSize ALSO updates the canvas's CSS dimensions.
-        // Without this, MindAR's internal sizing (which it does once at start)
-        // sticks and the canvas can end up the wrong width on Chrome Android,
-        // leaving the right portion of the screen black.
+        // Pass `true` so setSize updates the canvas's CSS dimensions too —
+        // without this, MindAR's initial sizing sticks and Chrome Android
+        // ends up with a black right portion when the URL bar collapses.
         this.mindarThree.renderer.setSize(w, h, true);
+        // Belt and braces — set the canvas inline style explicitly. Some
+        // mobile Chromes don't pick up the CSS change from setSize alone.
+        const canvas = this.mindarThree.renderer.domElement;
+        if (canvas) {
+            canvas.style.width = w + 'px';
+            canvas.style.height = h + 'px';
+        }
         if (this.mindarThree.camera?.isPerspectiveCamera) {
             this.mindarThree.camera.aspect = w / h;
             this.mindarThree.camera.updateProjectionMatrix();
@@ -227,6 +252,11 @@ export class AREngine {
 
     async dispose() {
         await this.stop();
+        if (this._ro) { try { this._ro.disconnect(); } catch (_) { } this._ro = null; }
+        for (const id of this._resizeKicks) {
+            try { cancelAnimationFrame(id); clearTimeout(id); } catch (_) { }
+        }
+        this._resizeKicks = [];
         if (this.maskEngine) { this.maskEngine.dispose(); this.maskEngine = null; }
         if (this.videoBg) {
             try { this.videoBg.texture.dispose(); } catch (_) { }

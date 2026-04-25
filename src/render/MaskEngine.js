@@ -5,6 +5,7 @@ import { CONFIG } from '../config.js';
 import { warn, err } from '../utils/logger.js';
 import { errMsg } from '../utils/errors.js';
 import { disposeTree } from '../utils/three-helpers.js';
+import { builders } from './maskBuilders.js';
 
 /**
  * MaskEngine — attaches a 3D mask (GLTF) to a MindAR face-mesh landmark.
@@ -62,18 +63,30 @@ export class MaskEngine {
     }
 
     /**
-     * Re-center a loaded GLTF scene at its bounding-box center and normalise it
-     * to roughly unit-size. GLTF authors put their model wherever they want in
-     * local space; we want them all to be face-relative on the anchor.
+     * Re-center a loaded GLTF scene at its bounding-box center AND normalise
+     * it to maxDim = 1. Authors put their models wherever they want in local
+     * space and at whatever scale they want; we collapse all of that so the
+     * per-mask `scale` field in CONFIG means "fraction of face dimension."
+     *
+     * Transform order matters: in Three.js a node's matrix is T * R * S, so
+     * vertex_world = position + scale * vertex_local. To center the SCALED
+     * bounds at origin, position must be `-center * invDim`, NOT `-center`.
+     * The previous implementation got this wrong and that's why scales
+     * looked off — the mask drifted away from the anchor as you tuned size.
      */
     _normalise(root) {
+        root.position.set(0, 0, 0);
+        root.scale.set(1, 1, 1);
+        root.rotation.set(0, 0, 0);
+        root.updateMatrixWorld(true);
         const box = new THREE.Box3().setFromObject(root);
         if (!box.isEmpty()) {
             const center = box.getCenter(new THREE.Vector3());
-            root.position.sub(center);
             const size = box.getSize(new THREE.Vector3());
             const maxDim = Math.max(size.x, size.y, size.z) || 1;
-            root.scale.multiplyScalar(1 / maxDim);
+            const invDim = 1 / maxDim;
+            root.scale.setScalar(invDim);
+            root.position.set(-center.x * invDim, -center.y * invDim, -center.z * invDim);
         }
         return root;
     }
@@ -111,6 +124,10 @@ export class MaskEngine {
             this.hooks.onLoadStart?.(def);
             if (def.kind === 'gltf') {
                 mesh = await this._loadGltf(def.url);
+            } else if (def.kind === 'procedural') {
+                const build = builders[def.builder];
+                if (!build) throw new Error(`Unknown builder: ${def.builder}`);
+                mesh = this._normalise(build());
             } else {
                 throw new Error(`Unknown mask kind: ${def.kind}`);
             }
