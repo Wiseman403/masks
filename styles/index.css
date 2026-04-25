@@ -60,16 +60,25 @@ button { font-family: inherit; color: inherit; }
     position: absolute;
     inset: 0;
     background: #000;
+    overflow: hidden;
 }
 
+/* MindAR appends the WebGL canvas + a <video> + (when not suppressed) a
+   uiLoading/uiScanning/uiError DOM tree. Force every direct child to be
+   either invisible or fully covering — defensively, in case MindAR ever
+   re-introduces overlays we forgot to disable. */
 #ar-container canvas {
+    position: absolute !important;
+    inset: 0 !important;
     width: 100% !important;
     height: 100% !important;
     display: block;
 }
 
-/* MindAR injects its own inline <video>; we render via a GL plane so
-   hide the raw element to avoid double-paint / black bars. */
+/* The raw <video> element MindAR injects is ours-by-reference (we sample
+   it through a VideoTexture) but should never be visible — it would
+   render at native camera resolution and produce black bars on
+   non-matching aspect ratios. */
 #ar-container video {
     position: absolute !important;
     width: 1px !important;
@@ -78,6 +87,14 @@ button { font-family: inherit; color: inherit; }
     pointer-events: none !important;
     left: 0 !important;
     top: 0 !important;
+}
+
+/* Catch-all: any leftover DOM child MindAR might inject (loading
+   overlays, error panels) — force it invisible so it can't fight our
+   layout. We pass uiLoading/uiScanning/uiError = 'no' to the constructor
+   already, but this is defense-in-depth. */
+#ar-container > div:not(.allow) {
+    display: none !important;
 }
 
 /* ── TOP BAR ────────────────────────────────────────────────────── */

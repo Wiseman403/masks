@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 
 import { CONFIG } from '../config.js';
 import { warn } from '../utils/logger.js';
@@ -14,17 +15,22 @@ import { MaskEngine } from '../render/MaskEngine.js';
  * `start()` and `stop()` are idempotent; concurrent calls are rejected by
  * `starting`/`stopping` guards so double-clicks never leak two MindAR sessions.
  *
- * MindAR is an ES module loaded at boot by App.boot(); by the time init() runs,
- * `window.MINDAR.FACE.MindARThree` must be available.
+ * The MindARThree constructor is called with `uiLoading: 'no'`,
+ * `uiScanning: 'no'`, `uiError: 'no'` — we render our own boot/permission
+ * overlays and don't want MindAR injecting absolutely-positioned DOM
+ * children that fight our layout (this caused a black gap on the right
+ * third of the screen on Chrome Android).
  */
 export class AREngine {
     /**
      * @param {HTMLElement} container
      * @param {import('../core/AppState.js').AppState} state
+     * @param {import('../services/NotificationSystem.js').NotificationSystem} [notify]
      */
-    constructor(container, state) {
+    constructor(container, state, notify) {
         this.container = container;
         this.state = state;
+        this.notify = notify;
         this.mindarThree = null;
         /** @type {MaskEngine|null} */
         this.maskEngine = null;
@@ -36,6 +42,9 @@ export class AREngine {
         this.videoBg = null;
         this.faceMesh = null;
         this._sizeVec = new THREE.Vector2();
+        this._envTexture = null;
+        /** @type {number | null} */
+        this._loadingToastId = null;
     }
 
     async init() {
@@ -46,6 +55,9 @@ export class AREngine {
         this.mindarThree = new MindARThree({
             container: this.container,
             shouldFaceUser: this.state.data.facing === 'user',
+            uiLoading: 'no',
+            uiScanning: 'no',
+            uiError: 'no',
         });
         const { renderer, scene } = this.mindarThree;
         renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -54,9 +66,16 @@ export class AREngine {
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, CONFIG.performance.pixelRatioCap));
         scene.background = null;
 
-        // Simple 3-point lighting — key + fill + ambient. Masks use PBR materials
-        // so decent lighting matters; the scene is face-facing so we light from +Z.
-        scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+        // PBR environment map — without this, metallic / glossy GLTF materials
+        // (DamagedHelmet, the skull's subsurface, etc.) render as flat blobs.
+        // RoomEnvironment is a free, pre-built indoor lightprobe ship-with-three.
+        const pmrem = new THREE.PMREMGenerator(renderer);
+        this._envTexture = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+        scene.environment = this._envTexture;
+        pmrem.dispose();
+
+        // Three-point lighting on top of the env map.
+        scene.add(new THREE.AmbientLight(0xffffff, 0.25));
         const key = new THREE.DirectionalLight(0xffffff, 0.85);
         key.position.set(0.4, 0.6, 1.0);
         scene.add(key);
@@ -79,7 +98,27 @@ export class AREngine {
         }
         scene.add(this.faceMesh);
 
-        this.maskEngine = new MaskEngine(this.mindarThree);
+        this.maskEngine = new MaskEngine(this.mindarThree, {
+            onLoadStart: (def) => {
+                // Surface a discreet "loading" toast for big GLTFs (helmet/skull
+                // can be 4–9 MB on LTE). 30s is well past the worst-case load
+                // time; the toast auto-dismisses sooner if onLoadEnd fires.
+                this._loadingToastId = this.notify?.push(
+                    'LOADING MASK',
+                    def.name,
+                    'info',
+                    30000,
+                ) ?? null;
+            },
+            onLoadEnd: (def, ok) => {
+                this._loadingToastId = null;
+                if (ok && def.credit) {
+                    this.notify?.push('CREDIT', def.credit, 'info', 5000);
+                } else if (!ok) {
+                    this.notify?.push('MASK FAILED', `Could not load ${def.name}.`, 'error', 4000);
+                }
+            },
+        });
         await this.maskEngine.applyMask(this.state.data.preset);
     }
 
@@ -126,7 +165,6 @@ export class AREngine {
             this.videoBg.uniforms.uMirror.value = this.state.data.mirror ? 1 : 0;
         }
 
-        // Face-detected state for UI signalling.
         const faceVisible = this.faceMesh?.visible === true;
         if (faceVisible) {
             this.lastFaceSeen = now;
@@ -145,7 +183,11 @@ export class AREngine {
         const w = this.container.clientWidth;
         const h = this.container.clientHeight;
         if (!w || !h) return;
-        this.mindarThree.renderer.setSize(w, h, false);
+        // Pass `true` so setSize ALSO updates the canvas's CSS dimensions.
+        // Without this, MindAR's internal sizing (which it does once at start)
+        // sticks and the canvas can end up the wrong width on Chrome Android,
+        // leaving the right portion of the screen black.
+        this.mindarThree.renderer.setSize(w, h, true);
         if (this.mindarThree.camera?.isPerspectiveCamera) {
             this.mindarThree.camera.aspect = w / h;
             this.mindarThree.camera.updateProjectionMatrix();
@@ -161,7 +203,6 @@ export class AREngine {
     }
 
     async setFacing(facing) {
-        // Hard restart so MindAR reacquires the camera with the new facingMode.
         await this.dispose();
         this.state.set({ facing });
         await this.init();
@@ -192,6 +233,7 @@ export class AREngine {
             disposeTree(this.videoBg.mesh);
             this.videoBg = null;
         }
+        if (this._envTexture) { try { this._envTexture.dispose(); } catch (_) { } this._envTexture = null; }
         if (this.mindarThree?.renderer) {
             try { this.mindarThree.renderer.setAnimationLoop(null); } catch (_) { }
             try { this.mindarThree.renderer.dispose(); } catch (_) { }

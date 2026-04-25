@@ -78,8 +78,8 @@ export class CaptureEngine {
 
     /**
      * Draw one frame onto the composite canvas. The renderer canvas already
-     * contains the video background plane (AR) or a procedural scene (demo),
-     * so we blit it directly — no need to re-composite the raw <video>.
+     * contains the video background plane + the masked face, so we blit it
+     * directly — no need to re-composite the raw <video>.
      * When the renderer canvas isn't available (engine swap in flight) we
      * clear to obsidian to avoid recording stale pixels.
      */

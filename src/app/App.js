@@ -122,7 +122,7 @@ export class App {
             arCont?.classList.remove('hidden-util');
             arCont?.setAttribute('aria-hidden', 'false');
 
-            if (!this.arEngine) this.arEngine = new AREngine(arCont, this.state);
+            if (!this.arEngine) this.arEngine = new AREngine(arCont, this.state, this.notify);
             await this.arEngine.start();
             this.capture.setEngine(this.arEngine);
             this.ui.setEngine(this.arEngine);
