@@ -55,14 +55,20 @@ export const CONFIG = Object.freeze({
             name: 'No Mask',
             kind: 'none',
         },
+        // Tuning history per user feedback:
+        //   v1: scale 0.95–1.55  → "too small / didn't show up"
+        //   v2: scale 1.2–4.0    → "too big" (and hat had a big gap above the head)
+        //   v3 (current): midpoint between v1 and v2; hat offset cut nearly in half.
+        // Each entry's `scale` and `offset` were re-derived as ~halfway between
+        // v1 and v2 — adjust by ±10–15% per round of user feedback.
         {
             id: 'sunglasses',
             name: 'Sunglasses',
             kind: 'procedural',
             builder: 'sunglasses',
             landmark: 168,
-            scale: 1.2,
-            offset: [0, 0.55, 0.15],
+            scale: 0.75,
+            offset: [0, 0.40, 0.10],
             rotation: [0, 0, 0],
         },
         {
@@ -71,8 +77,8 @@ export const CONFIG = Object.freeze({
             kind: 'procedural',
             builder: 'cat',
             landmark: 10,
-            scale: 1.6,
-            offset: [0, 0.8, 0.0],
+            scale: 1.0,
+            offset: [0, 0.55, 0.0],
             rotation: [0, 0, 0],
         },
         {
@@ -81,8 +87,8 @@ export const CONFIG = Object.freeze({
             kind: 'gltf',
             url: 'https://cdn.jsdelivr.net/gh/KhronosGroup/glTF-Sample-Assets@main/Models/DamagedHelmet/glTF-Binary/DamagedHelmet.glb',
             landmark: 168,
-            scale: 4.0,
-            offset: [0, 0.4, 0.0],
+            scale: 2.6,
+            offset: [0, 0.25, 0.0],
             rotation: [0, 0, 0],
             credit: '"Battle Damaged Sci-Fi Helmet" by theblueturtle_ (CC-BY-4.0)',
         },
@@ -92,8 +98,8 @@ export const CONFIG = Object.freeze({
             kind: 'gltf',
             url: 'https://cdn.jsdelivr.net/gh/KhronosGroup/glTF-Sample-Assets@main/Models/ScatteringSkull/glTF-Binary/ScatteringSkull.glb',
             landmark: 168,
-            scale: 3.5,
-            offset: [0, 0.3, 0.0],
+            scale: 2.2,
+            offset: [0, 0.18, 0.0],
             rotation: [0, 0, 0],
             credit: '"Scattering Skull" — Khronos sample (CC0-1.0)',
         },
@@ -103,8 +109,15 @@ export const CONFIG = Object.freeze({
             kind: 'gltf',
             url: 'https://cdn.jsdelivr.net/gh/hiukim/mind-ar-js@master/examples/face-tracking/assets/hat/scene.gltf',
             landmark: 10,
+            // Scale unchanged — user only flagged position. Offset cut from
+            // 1.6 → 0.85 to seat the brim on top of the head instead of
+            // floating above it. The brim of a normalised hat sits at
+            // roughly y = -0.5*scale relative to its own centre, so for
+            // scale 3.0 the brim is at -1.5; offset 0.85 puts the brim at
+            // y = -0.65 in anchor space — slightly INTO the head, which
+            // closes the visible gap by half a face width.
             scale: 3.0,
-            offset: [0, 1.6, 0.0],
+            offset: [0, 0.85, 0.0],
             rotation: [0, 0, 0],
             credit: '"Clown Hat" by PatelDev (CC-BY-4.0)',
         },
